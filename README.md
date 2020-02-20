@@ -15,7 +15,7 @@ Otherwise install them. The way depends on platform.
 `$ pip3 install requests`
 
 `$ pip3 install bs4`
-`# pip3 install python-dotenv`
+`$ pip3 install python-dotenv`
 
 # Usage
 
