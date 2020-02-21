@@ -379,7 +379,7 @@ def submitProperty(property, post=None, update=False):
 
 	# content
 	title = '%s, %s, %s' % (prop['full_address'], prop['state'], prop['postcode'])
-	content = '<strong>%s</strong>\n%s' % (prop['headline'], prop['description'])
+	content = '<p><strong>%s</strong></p>\n%s' % (prop['headline'], prop['description'])
 
 	# floor plans
 	floorPlansResponse = req('GET', property['relationships']['floorplans']['links']['related'], headers=HEADERS_AUTH_EAGLE)
