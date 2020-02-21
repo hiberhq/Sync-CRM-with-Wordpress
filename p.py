@@ -196,13 +196,13 @@ def reqToWPREST(method, url, data='', headers={}, files={}):
 		return reqToWPREST(method, url, data, headers)
 
 
-def reqToWPRESTAttachment(url):
-	image = req('GET', url, dataType='binary')
+def reqToWPRESTAttachment(url, attachType):
+	attach = req('GET', url, dataType='binary')
 
-	imageName = os.path.basename( urlparse(url).path )
-	imageExtention = os.path.splitext(url)[1][1:]
-	headers = {'Authorization': 'Basic ' + WP_REST_TOKEN.decode('utf-8'), 'Content-Type': 'image/%s' % imageExtention, 'Content-Disposition': 'attachment; filename=%s' % imageName, 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36'}
-	response = reqToWPREST('POST', SITE_DOMAIN +  '/wp-json/wp/v2/media', data=image, headers=headers)
+	attachName = os.path.basename( urlparse(url).path )
+	attachExtention = os.path.splitext(url)[1][1:]
+	headers = {'Authorization': 'Basic ' + WP_REST_TOKEN.decode('utf-8'), 'Content-Type': '%s/%s' % (attachType, attachExtention), 'Content-Disposition': 'attachment; filename=%s' % attachName, 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36'}
+	response = reqToWPREST('POST', SITE_DOMAIN +  '/wp-json/wp/v2/media', data=attach, headers=headers)
 
 	if 'id' in response:
 		return response['id']
@@ -294,12 +294,12 @@ def submitProperty(property, post=None, update=False):
 		if prop['primary_image']:
 			if not post['_thumbnail_id']:
 				# if featured images was added later
-				featuredID = reqToWPRESTAttachment(prop['primary_image'])
+				featuredID = reqToWPRESTAttachment(prop['primary_image'], 'image')
 			else:
 				# check if it was chnaged
 				if prop['primary_image'] != post['_thumbnail_name']:
 					# changed
-					featuredID = reqToWPRESTAttachment(prop['primary_image'])
+					featuredID = reqToWPRESTAttachment(prop['primary_image'], 'image')
 				else:
 					# the same
 					featuredID = post['_thumbnail_id']
@@ -310,57 +310,21 @@ def submitProperty(property, post=None, update=False):
 		# set initially
 		if prop['primary_image']:
 			debug('Trying to upload featured attachment.')
-			featuredID = reqToWPRESTAttachment(prop['primary_image'])
+			featuredID = reqToWPRESTAttachment(prop['primary_image'], 'image')
 			if featuredID:
 				debug('Featured attachment id=%s uploaded.' % featuredID)
+			else:
+				log('Couldn\'t upload featured attachment.', 'red')
 		else:
 			featuredID = ''
 
+	# property attachments: images
+	imageIDsList = post['crm_image_ids'] if update else None
+	imageIDs = uploadAttachments(property['relationships']['images']['links']['related'], update, imageIDsList, 'image')
 
-	# media: property images
-	if property['relationships']['images']['links']['related']:
-		propertyImagesResponse = req('GET', property['relationships']['images']['links']['related'], headers=HEADERS_AUTH_EAGLE)
-	if not 'errors' in propertyImagesResponse:
-		if update:
-			if 'data' in propertyImagesResponse:
-				crmImageIDs = []
-				siteImageIDs = []
-				for id in post['crm_image_ids']:
-					for i, image in enumerate(propertyImagesResponse['data']):
-						if image['id'] == id:
-							siteImageIDs.append(id)							
-							crmImageIDs.append(image['id'])
-							break
-						else:
-							if i == len(propertyImagesResponse) - 1:
-								debug('Adding new attachment to post...')
-								imageID = reqToWPRESTAttachment(image['attributes']['url'])
-								if imageID:
-									siteImageIDs.append(imageID)
-									debug('Attachment id=%s was added.' % imageID)
-								crmImageIDs.append(image['id'])
-			else:
-				debug('No data received from %s' % property['relationships']['images']['links']['related'])
-				# unset
-				crmImageIDs = []
-				siteImageIDs = []
-
-		else:
-			# set initially
-			crmImageIDs = []
-			siteImageIDs = []
-			if 'data' in propertyImagesResponse:
-				for image in propertyImagesResponse['data']:
-					debug('Posting new attachment initially...')
-					imageID = reqToWPRESTAttachment(image['attributes']['url'])
-					if imageID:
-						siteImageIDs.append(imageID)
-						debug('Attachment id=%s submitted.' % imageID)
-					crmImageIDs.append(image['id'])
-	else:
-		crmImageIDs = []
-		siteImageIDs = []
-		log('Error while trying to get Eagle images response. %s.' % propertyImagesResponse['errors'][0]['detail'], 'red')
+	# property attachments: documents
+	attachIDsList = post['crm_attachment_ids'] if update else None
+	attachIDs = uploadAttachments(property['relationships']['documents']['links']['related'], update, attachIDsList, 'application')
 
 	# OFI
 	dateOFI = ''
@@ -487,9 +451,11 @@ def submitProperty(property, post=None, update=False):
 		'fave_floor_plans_enable': floorPlanShow, # enable/disable. default: disable
 		'floor_plans': floorPlan,
 		'fave_video_url': prop['video_url'],
-		'crm_image_ids': crmImageIDs,
-		'fave_property_images': siteImageIDs,
-		'fw_options': dateOFI
+		'crm_image_ids': imageIDs[0],
+		'fave_property_images': imageIDs[1],
+		'crm_attachment_ids': attachIDs[0],
+		'fave_attachments': attachIDs[1],
+		'fw_options': dateOFI,
 		# some defaults
 		# 'fave_featured': 0,
 		# 'fave_property_size': '',
@@ -517,7 +483,7 @@ def submitProperty(property, post=None, update=False):
 		dataAttach = {
 			'post_parent': response['id']
 		}
-		attachList = siteImageIDs + [featuredID] if featuredID else siteImageIDs
+		attachList = imageIDs[1] + attachIDs[1] + [featuredID] if featuredID else imageIDs[1] + attachIDs[1]
 		for attachID in attachList:
 			reqToWPREST('POST', SITE_DOMAIN + '/wp-json/wp/v2/media/%s' % attachID, data=json.dumps(dataAttach))
 
@@ -572,6 +538,59 @@ def getAgentByCRMID(id):
 					continue
 		else:
 			log('Couldn\'t get proper response. %s' % crmAgents, 'red')
+
+
+def uploadAttachments(url, update, attachIDs, attachType):
+	attachResponse = req('GET', url, headers=HEADERS_AUTH_EAGLE)
+	
+	if not 'errors' in attachResponse:
+		if update:
+			if 'data' in attachResponse:
+				crmAttachIDs = []
+				siteAttachIDs = []
+				for id in attachIDs:
+					for i, attach in enumerate(attachResponse['data']):
+						if attach['id'] == id:
+							siteAttachIDs.append(id)							
+							crmAttachIDs.append(attach['id'])
+							break
+						else:
+							if i == len(attachResponse) - 1:
+								debug('Adding new attachment to post...')
+								attachID = reqToWPRESTAttachment(attach['attributes']['url'], attachType)
+								if attachID:
+									siteAttachIDs.append(attachID)
+									debug('Attachment id=%s was added.' % attachID)
+								else:
+									log('Couldn\'t upload attachment.', 'red')
+								crmAttachIDs.append(attach['id'])
+			else:
+				debug('No data received from %s' % url)
+				# unset
+				crmAttachIDs = []
+				siteAttachIDs = []
+
+		else:
+			# set initially
+			crmAttachIDs = []
+			siteAttachIDs = []
+			if 'data' in attachResponse:
+				for attach in attachResponse['data']:
+					debug('Posting new attachment initially...')
+					attachID = reqToWPRESTAttachment(attach['attributes']['url'], attachType)
+					if attachID:
+						siteAttachIDs.append(attachID)
+						debug('Attachment id=%s submitted.' % attachID)
+					else:
+						log('Couldn\'t upload attachment.', 'red')
+					crmAttachIDs.append(attach['id'])
+					
+	else:
+		crmAttachIDs = []
+		siteAttachIDs = []
+		log('Error while trying to get Eagle attachments response. %s.' % attachResponse['errors'][0]['detail'], 'red')
+
+	return (crmAttachIDs, siteAttachIDs)
 
 
 def checkPropertyChanges(post, property):
