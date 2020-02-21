@@ -16,7 +16,7 @@ load_dotenv()
 os.system('clear')
 
 DEBUG = True
-RUN_INTERVAL = 60 * 500
+RUN_INTERVAL = 60 * 15
 EAGLE_LOGIN = os.getenv('EAGLE_LOGIN')
 EAGLE_PASS = os.getenv('EAGLE_PASS')
 SITE_LOGIN = os.getenv('SITE_LOGIN')
@@ -50,11 +50,14 @@ def log(text, color = ''):
 	print(colors.get(color, '\x1b[0m'), text, '\x1b[0m')
 
 
-def debug(text):
+def debug(text, timelog=False):
 	if not DEBUG:
 		return
 
-	print(text)
+	if timelog:
+		print('%s %s' % (datetime.now().strftime('%d %b %H:%M:%S'), text))
+	else:
+		print(text)
 
 
 def getEagleToken():
@@ -92,7 +95,7 @@ def req(method, url, dataType='json', data='', headers={}):
 			return data
 
 		except Exception as e:
-			log('Couldn\'t parse Response. %s' %e, 'red')
+			log('Couldn\'t parse Response. %s' % e, 'red')
 			exit(-1)
 
 	except requests.exceptions.RequestException as e:
@@ -125,6 +128,7 @@ def getSitePropertiesList():
 			output.append(item)
 
 		if len(response) < limit:
+			debug('Received site data.')
 			return output
 
 		page += 1
@@ -138,7 +142,6 @@ def getCRMPropertiesList():
 	try:
 		while True:
 			response = requests.get('https://www.eagleagent.com.au/api/v2/properties?page%5Blimit%5D=' + str(limit) + '&page%5Boffset%5D=' + str(offset), headers=HEADERS_AUTH_EAGLE)
-			log('request...')
 
 			try:
 				data = json.loads(response.text)
@@ -147,7 +150,7 @@ def getCRMPropertiesList():
 					output.append(item)
 
 				if len(data['data']) < limit:
-					debug('Received all data from CRM.')
+					debug('Received CRM data.')
 					return output
 
 			except Exception as e:
@@ -161,13 +164,9 @@ def getCRMPropertiesList():
 		exit(-1)
 
 
-# temp save it as a file
-# with open('crm.json', 'w') as file:
-	# file.write( json.dumps(getCRMPropertiesList()) )
-
-# temp save it as a file
-# for item in t:
-	# log('%s	%s %s' % (item['id'], item['attributes']['property_type'], item['attributes']['full_address']), 'yellow')
+def getProperty(id):
+	response = requests.get('https://www.eagleagent.com.au/api/v2/properties/%s' % id, headers=HEADERS_AUTH_EAGLE)
+	return json.loads(response.text)	
 
 
 def reqToWPREST(method, url, data='', headers={}, files={}):
@@ -208,9 +207,6 @@ def reqToWPRESTAttachment(url):
 	if 'id' in response:
 		return response['id']
 
-	return ''
-
-
 
 def normalizeTitle(string):
 	return string.replace(' ', '').replace(',', '').lower()
@@ -247,7 +243,7 @@ def checkProperties():
 	start = time.perf_counter()
 
 	# G09/1 Queen Street, Blackburn, VIC, 3130				 # site
-	# G09 / 1 Queen Street, Blackburn						 # crm
+	# G09 / 1 Queen Street, Blackburn					 # crm
 
 	i = 0
 	obj = {}
@@ -316,7 +312,7 @@ def submitProperty(property, post=None, update=False):
 			debug('Trying to upload featured attachment.')
 			featuredID = reqToWPRESTAttachment(prop['primary_image'])
 			if featuredID:
-				debug('Featured attachment uploaded. %s' % featuredID)
+				debug('Featured attachment id=%s uploaded.' % featuredID)
 		else:
 			featuredID = ''
 
@@ -337,11 +333,11 @@ def submitProperty(property, post=None, update=False):
 							break
 						else:
 							if i == len(propertyImagesResponse) - 1:
-								debug('Posting new attachment...')
+								debug('Adding new attachment to post...')
 								imageID = reqToWPRESTAttachment(image['attributes']['url'])
 								if imageID:
 									siteImageIDs.append(imageID)
-									debug('Attachment id=%s submitted.' % imageID)
+									debug('Attachment id=%s was added.' % imageID)
 								crmImageIDs.append(image['id'])
 			else:
 				debug('No data received from %s' % property['relationships']['images']['links']['related'])
@@ -383,13 +379,15 @@ def submitProperty(property, post=None, update=False):
 
 	# content
 	title = '%s, %s, %s' % (prop['full_address'], prop['state'], prop['postcode'])
-	content = '<strong>' + prop['headline'] + '</strong>\n' + prop['description']
+	content = '<strong>%s</strong>\n%s' % (prop['headline'], prop['description'])
 
 	# floor plans
-	floorPlansResponse = req('GET', property['relationships']['floorplans']['links']['related'])
+	floorPlansResponse = req('GET', property['relationships']['floorplans']['links']['related'], headers=HEADERS_AUTH_EAGLE)
 	if 'data' in floorPlansResponse and len(floorPlansResponse['data']):
 		# get 1st one. In db it might have multiple, but Front-End doen't support multiple images
-		floorPlan = {'fave_plan_title': 'Floor plan', 'fave_plan_image': floorPlansResponse['data'][0]['attributes']['url']}
+		floorPlan = []
+		for plan in floorPlansResponse['data']:
+			floorPlan.append( {'fave_plan_title': 'Floor plan', 'fave_plan_image': plan['attributes']['url']} )
 		floorPlanShow = 'enable'
 	else:
 		floorPlan = ''
@@ -441,21 +439,8 @@ def submitProperty(property, post=None, update=False):
 	}
 
 	# agents
-	agents = {
-		'816': 6378,
-		'10326': 6994,
-		'3603': 2948,
-		'4911': 3393,
-		'10228': 7061,
-		'2345': 158,
-		'3130': 72,
-		'2415': 150,
-		#???: 156,
-		#???: 2048,
-		'2398': 2018
-	}
 	# get last id in agents array
-	agent = agents[prop['agent_ids'][len(prop['agent_ids']) - 1]]
+	agent = getAgentByCRMID( [prop['agent_ids'][len(prop['agent_ids']) - 1]] )
 
 	# price
 	price = prop['alt_to_price'] if prop['alt_to_price'] else prop['price'] if prop['price'] and prop['price'] != '0.0' else prop['advertised_price']
@@ -519,17 +504,14 @@ def submitProperty(property, post=None, update=False):
 		# 'fave_additional_features_enable':  'disable',
 		# 'additional_features': [],
 	}
-	debug(json.dumps(data))
 
 	if update:
-		debug('Property exists, so update it.')
 		response = reqToWPREST('POST', SITE_DOMAIN + '/wp-json/wp/v2/property/%s' % post['id'], data=json.dumps(data))
 	else:
-		debug('Add a new property.')
 		response = reqToWPREST('POST', SITE_DOMAIN + '/wp-json/wp/v2/property', data=json.dumps(data))
 
 	if 'id' in response:
-		log('Property id=%s was %s. URL=%s' % (response['id'], 'updated' if update else 'added', response['link']), 'yellow')
+		log('Property id=%s was %s. URL=%s' % (property['id'], 'updated' if update else 'added', response['link']), 'yellow')
 
 		# attach attachments to post
 		dataAttach = {
@@ -550,12 +532,55 @@ def getPostByCRMID(crmID, posts):
 			return post
 
 
+def getAgentByCRMID(id):
+	id = str(id)
+
+	agents = {
+		'816': 6378,
+		'10326': 6994,
+		'3603': 2948,
+		'4911': 3393,
+		'10228': 7061,
+		'2345': 158,
+		'3130': 72,
+		'2415': 150,
+		'2398': 2018
+	}
+
+	# search in cached data firstly
+	if id in agents:
+		# return wordpress agent ID
+		return agents[id]
+	else:
+		# new agent was added to CRM. Try to find him on the site
+		crmAgents = req('GET', 'https://www.eagleagent.com.au/api/v2/agents', headers=HEADERS_AUTH_EAGLE)
+		siteAgents = reqToWPREST('GET', SITE_DOMAIN + '/wp-json/wp/v2/houzez_agent/')
+
+		if 'data' in crmAgents:
+			for cperson in crmAgents['data']:
+				if cperson['id'] == id:
+
+					for i, sperson in enumerate(siteAgents):
+						if cperson['attributes']['name'] == sperson['title']['rendered']:
+							return sperson['id']
+						else:
+							if len(siteAgents) - 1 == i:
+								log('Agent %s was not found on the site.' % cperson['attributes']['name'], 'red')
+								exit(-1)
+
+				else:
+					continue
+		else:
+			log('Couldn\'t get proper response. %s' % crmAgents, 'red')
+
+
 def checkPropertyChanges(post, property):
 	prop = property['attributes']
 	propStatus = prop['status'].lower()
 
 	if prop['updated_at'] == post['crm_updated']:
 		# runaway if not changed
+		debug('Property id=%s wasn\'t changed. Nothing to update.' % property['id'])
 		return
 
 	if propStatus in ['active', 'let', 'under application', 'under offer', 'sold']:
@@ -597,6 +622,7 @@ def checkNewProperties():
 					post = getPostByCRMID(item['id'], dataFromSite)
 
 					if post and 'crm_id' in post and len(post['crm_id']) > 0:
+						debug('Property id=%s found.' % item['id'])
 						checkPropertyChanges(post, item)
 					else:
 						if status in ['active', 'let', 'under application', 'under offer', 'sold']:
@@ -605,6 +631,7 @@ def checkNewProperties():
 							# do not pass others
 							continue
 
+						debug('Submit new property.')
 						submitProperty(item)
 
 			else:
@@ -612,13 +639,13 @@ def checkNewProperties():
 
 
 def run():
-	print('Start...')
+	debug('Start...', True)
 	checkNewProperties()
 
 
 if __name__ == '__main__':
 	while True:
-		eagleToken = getEagleToken()
-		HEADERS_AUTH_EAGLE = {'Authorization': eagleToken, 'Content-Type': 'application/vnd.api+json'}
+		HEADERS_AUTH_EAGLE = {'Authorization': getEagleToken(), 'Content-Type': 'application/vnd.api+json'}
 		run()
+		debug('Task completed.', True)
 		time.sleep(RUN_INTERVAL)
