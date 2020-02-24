@@ -21,7 +21,7 @@ EAGLE_LOGIN = os.getenv('EAGLE_LOGIN')
 EAGLE_PASS = os.getenv('EAGLE_PASS')
 SITE_LOGIN = os.getenv('SITE_LOGIN')
 SITE_PASS = os.getenv('SITE_PASS')
-SITE_DOMAIN = 'http://savoy' if bool( re.match('^.*local.*$', socket.gethostname()) ) else 'https://savoy.com.au'
+SITE_DOMAIN = 'http://savoy' if bool( re.match('^.*local.*$', socket.gethostname()) ) else 'https://www.savoy.com.au'
 WP_REST_TOKEN = base64.standard_b64encode( bytes(SITE_LOGIN + ':' + SITE_PASS, encoding='utf-8') )
 HEADERS_AUTH_WP = {'Authorization': 'Basic ' + WP_REST_TOKEN.decode('utf-8'), 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36'}
 HEADERS_EAGLE_TOKEN_REQUEST = {'Content-Type': 'application/vnd.api+json'}
