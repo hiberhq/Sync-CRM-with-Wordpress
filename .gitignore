@@ -1,2 +1,4 @@
 .env
 connect.sh
+test.py
+.DS_Store
