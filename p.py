@@ -3,7 +3,6 @@
 import os
 from dotenv import load_dotenv
 import requests
-from urllib.parse import urlparse
 import re
 import json
 import base64
@@ -174,7 +173,7 @@ def reqToWPREST(method, url, data='', headers={}, files={}):
 		headers=HEADERS_AUTH_WP
 
 	try:
-		req = requests.request(method, url, data=data, headers=headers, timeout=10)
+		req = requests.request(method, url, data=data, headers=headers, timeout=90)
 		responseCode = req.status_code
 		response = req.text
 	except Exception as e:
@@ -199,7 +198,7 @@ def reqToWPREST(method, url, data='', headers={}, files={}):
 def reqToWPRESTAttachment(url, attachType):
 	attach = req('GET', url, dataType='binary')
 
-	attachName = os.path.basename( urlparse(url).path )
+	attachName = os.path.basename(url)
 	attachExtention = os.path.splitext(url)[1][1:]
 	headers = {'Authorization': 'Basic ' + WP_REST_TOKEN.decode('utf-8'), 'Content-Type': '%s/%s' % (attachType, attachExtention), 'Content-Disposition': 'attachment; filename=%s' % attachName, 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36'}
 	response = reqToWPREST('POST', SITE_DOMAIN +  '/wp-json/wp/v2/media', data=attach, headers=headers)
@@ -348,7 +347,6 @@ def submitProperty(property, post=None, update=False):
 	# floor plans
 	floorPlansResponse = req('GET', property['relationships']['floorplans']['links']['related'], headers=HEADERS_AUTH_EAGLE)
 	if 'data' in floorPlansResponse and len(floorPlansResponse['data']):
-		# get 1st one. In db it might have multiple, but Front-End doen't support multiple images
 		floorPlan = []
 		for plan in floorPlansResponse['data']:
 			floorPlan.append( {'fave_plan_title': 'Floor plan', 'fave_plan_image': plan['attributes']['url']} )

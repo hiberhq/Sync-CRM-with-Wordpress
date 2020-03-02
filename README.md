@@ -12,8 +12,6 @@ To check if it is installed:
 Otherwise install them. The way depends on platform.
 
 # Install dependecies
-`$ pip3 install requests`
-
 `$ pip3 install bs4`
 
 `$ pip3 install python-dotenv`
@@ -26,7 +24,7 @@ Otherwise install them. The way depends on platform.
 ## Hint
 Run script in background:
 
-`nohup python3 p.py &`
+`nohup python3 -u p.py &`
 
 Check python processes:
 
