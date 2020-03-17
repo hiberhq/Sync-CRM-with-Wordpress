@@ -318,12 +318,14 @@ def submitProperty(property, post=None, update=False):
 			featuredID = ''
 
 	# property attachments: images
-	imageIDsList = post['crm_image_ids'] if update else None
-	imageIDs = uploadAttachments(property['relationships']['images']['links']['related'], update, imageIDsList, 'image')
+	crmImageIDsList = post['crm_image_ids'] if update else []
+	siteImageIDsList = post['fave_property_images'] if update else []
+	imageIDs = uploadAttachments(property['relationships']['images']['links']['related'] + '?sort=position', update, crmImageIDsList, siteImageIDsList, 'image')
 
 	# property attachments: documents
-	attachIDsList = post['crm_attachment_ids'] if update else None
-	attachIDs = uploadAttachments(property['relationships']['documents']['links']['related'], update, attachIDsList, 'application')
+	crmAttachIDsList = post['crm_attachment_ids'] if update else []
+	siteAttachIDsList = post['fave_attachments'] if update else []
+	attachIDs = uploadAttachments(property['relationships']['documents']['links']['related'], update, crmAttachIDsList, siteAttachIDsList, 'application')
 
 	# OFI
 	dateOFI = ''
@@ -402,7 +404,7 @@ def submitProperty(property, post=None, update=False):
 
 	# agents
 	# get last id in agents array
-	agent = getAgentByCRMID( [prop['agent_ids'][len(prop['agent_ids']) - 1]] )
+	agent = getAgentByCRMID( [ prop['agent_ids'][len(prop['agent_ids']) - 1] ] )
 
 	# price
 	price = prop['alt_to_price'] if prop['alt_to_price'] else prop['price'] if prop['price'] and prop['price'] != '0.0' else prop['advertised_price']
@@ -497,7 +499,6 @@ def getPostByCRMID(crmID, posts):
 
 
 def getAgentByCRMID(id):
-	id = str(id)
 
 	agents = {
 		'816': 6378,
@@ -510,83 +511,106 @@ def getAgentByCRMID(id):
 		'2415': 150,
 		'2398': 2018
 	}
-
+        
 	# search in cached data firstly
-	if id in agents:
-		# return wordpress agent ID
-		return agents[id]
-	else:
-		# new agent was added to CRM. Try to find him on the site
-		crmAgents = req('GET', 'https://www.eagleagent.com.au/api/v2/agents', headers=HEADERS_AUTH_EAGLE)
-		siteAgents = reqToWPREST('GET', SITE_DOMAIN + '/wp-json/wp/v2/houzez_agent/')
-
-		if 'data' in crmAgents:
-			for cperson in crmAgents['data']:
-				if cperson['id'] == id:
-
-					for i, sperson in enumerate(siteAgents):
-						if cperson['attributes']['name'] == sperson['title']['rendered']:
-							return sperson['id']
-						else:
-							if len(siteAgents) - 1 == i:
-								log('Agent %s was not found on the site.' % cperson['attributes']['name'], 'red')
-								exit(-1)
-
-				else:
-					continue
+	for agent in id:
+		if agent in agents:
+			# return wordpress agent ID
+			return agents[agent]
 		else:
-			log('Couldn\'t get proper response. %s' % crmAgents, 'red')
+			# new agent was added to CRM. Try to find him on the site
+			crmAgents = req('GET', 'https://www.eagleagent.com.au/api/v2/agents', headers=HEADERS_AUTH_EAGLE)
+			siteAgents = reqToWPREST('GET', SITE_DOMAIN + '/wp-json/wp/v2/houzez_agent/')
+
+			if 'data' in crmAgents:
+				for cperson in crmAgents['data']:
+					if cperson['id'] == agent:
+
+						for i, sperson in enumerate(siteAgents):
+							if cperson['attributes']['name'] == sperson['title']['rendered']:
+								return sperson['id']
+							else:
+								if len(siteAgents) - 1 == i:
+									log('Agent %s was not found on the site.' % cperson['attributes']['name'], 'red')
+									exit(-1)
+
+					else:
+						continue
+			else:
+				log('Couldn\'t get proper response. %s' % crmAgents, 'red')
 
 
-def uploadAttachments(url, update, attachIDs, attachType):
-	attachResponse = req('GET', url, headers=HEADERS_AUTH_EAGLE)
+def uploadAttachments(url, update, crmSavedIDs, siteSavedIDs, attachType):
+	crmAttachIDs = []
+	siteAttachIDs = []
+
+	response = req('GET', url, headers=HEADERS_AUTH_EAGLE)
 	
-	if not 'errors' in attachResponse:
+	if not 'errors' in response:
 		if update:
-			if 'data' in attachResponse:
-				crmAttachIDs = []
-				siteAttachIDs = []
-				for id in attachIDs:
-					for i, attach in enumerate(attachResponse['data']):
-						if attach['id'] == id:
-							siteAttachIDs.append(id)							
-							crmAttachIDs.append(attach['id'])
-							break
+			if 'data' in response:
+				# list of crm images IDs
+				crmActualIDs = []
+				for item in response['data']:
+					crmActualIDs.append(item['id'])
+
+				for item in response['data']:
+					if item['id'] in crmSavedIDs:
+						crmAttachIDs.append(item['id'])
+						siteAttachIDs.append( siteSavedIDs[ crmSavedIDs.index(item['id']) ] )
+					else:
+						# upload attach
+						debug('Adding new attachment to post...')
+						uploadedID = reqToWPRESTAttachment(item['attributes']['url'], attachType)
+						if uploadedID:
+							crmAttachIDs.append(item['id'])
+							siteAttachIDs.append(uploadedID)
+							debug('Attachment id=%s was added.' % uploadedID)
 						else:
-							if i == len(attachResponse) - 1:
-								debug('Adding new attachment to post...')
-								attachID = reqToWPRESTAttachment(attach['attributes']['url'], attachType)
-								if attachID:
-									siteAttachIDs.append(attachID)
-									debug('Attachment id=%s was added.' % attachID)
-								else:
-									log('Couldn\'t upload attachment.', 'red')
-								crmAttachIDs.append(attach['id'])
+							log('Couldn\'t upload attachment.', 'red')
+						
+				for i, sid in enumerate(crmSavedIDs):
+					# attach was removed in crm
+					if sid not in crmActualIDs:
+						# and should be removed on the site
+
+						# unset attachment meta
+						# fave_property_images/fave_attachments and crm_image_ids/crm_attachment_ids should be unset
+						# but it doesn't make much sense in real cases
+
+						# remove attachment itself
+						rdata = {
+							'force': True
+						}
+						reqRemove = reqToWPREST('DELETE', SITE_DOMAIN + '/wp-json/wp/v2/media/%s' % siteSavedIDs[i], data=json.dumps(rdata))
+						if reqRemove['deleted']:
+							debug('Attachment id=%s was removed.' % siteSavedIDs[i])
+						else:
+							# append attach again to try remove later
+							crmAttachIDs.append(sid)
+							# i is the index of item in siteSavedIDs list
+							siteAttachIDs.append(siteSavedIDs[i])
+					else:
+						pass
+
 			else:
 				debug('No data received from %s' % url)
-				# unset
-				crmAttachIDs = []
-				siteAttachIDs = []
 
 		else:
 			# set initially
-			crmAttachIDs = []
-			siteAttachIDs = []
-			if 'data' in attachResponse:
-				for attach in attachResponse['data']:
+			if 'data' in response:
+				for item in response['data']:
 					debug('Posting new attachment initially...')
-					attachID = reqToWPRESTAttachment(attach['attributes']['url'], attachType)
+					attachID = reqToWPRESTAttachment(item['attributes']['url'], attachType)
 					if attachID:
 						siteAttachIDs.append(attachID)
+						crmAttachIDs.append(item['id'])
 						debug('Attachment id=%s submitted.' % attachID)
 					else:
 						log('Couldn\'t upload attachment.', 'red')
-					crmAttachIDs.append(attach['id'])
 					
 	else:
-		crmAttachIDs = []
-		siteAttachIDs = []
-		log('Error while trying to get Eagle attachments response. %s.' % attachResponse['errors'][0]['detail'], 'red')
+		log('Error while trying to get Eagle attachments response. %s.' % response['errors'][0]['detail'], 'red')
 
 	return (crmAttachIDs, siteAttachIDs)
 
