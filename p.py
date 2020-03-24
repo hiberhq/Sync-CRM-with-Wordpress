@@ -685,8 +685,8 @@ def run():
 
 
 if __name__ == '__main__':
+	HEADERS_AUTH_EAGLE = {'Authorization': getEagleToken(), 'Content-Type': 'application/vnd.api+json'}
 	while True:
-		HEADERS_AUTH_EAGLE = {'Authorization': getEagleToken(), 'Content-Type': 'application/vnd.api+json'}
 		run()
 		debug('Task completed.', True)
 		time.sleep(RUN_INTERVAL)
