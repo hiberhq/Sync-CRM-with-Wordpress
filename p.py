@@ -583,7 +583,7 @@ def uploadAttachments(url, update, crmSavedIDs, siteSavedIDs, attachType):
 							'force': True
 						}
 						reqRemove = reqToWPREST('DELETE', SITE_DOMAIN + '/wp-json/wp/v2/media/%s' % siteSavedIDs[i], data=json.dumps(rdata))
-						if reqRemove['deleted']:
+						if 'deleted' in reqRemove:
 							debug('Attachment id=%s was removed.' % siteSavedIDs[i])
 						else:
 							# append attach again to try remove later
@@ -634,7 +634,7 @@ def checkPropertyChanges(post, property):
 			'force': False
 		}
 		req = reqToWPREST('DELETE', SITE_DOMAIN + '/wp-json/wp/v2/property/%d' % post['id'], data=json.dumps(rdata))
-		if req['deleted']:
+		if 'deleted' in req:
 			log('Property id=%s was deleted. Status %s -> %s' % (post['id'], post['property_status'], prop['status']), 'cyan')
 		else:
 			log('Property wasn\'t deleted. %s. Status %s -> %s' % (req, post['property_status'], prop['status']), 'red')
