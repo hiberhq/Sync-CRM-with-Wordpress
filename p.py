@@ -371,7 +371,11 @@ def submitProperty(property, post=None, update=False):
 			else:
 				status = ['for sale']
 	elif propStatus == 'under offer':
-		status = ['for sale', 'under offer']
+		# Seems like API gives 'under offer' for both sale and rent listings, instead of 'under application' for rent listing
+		if prop['sale_or_rent'].lower() == 'rent':
+			status = ['for rent', 'under application']
+		else:
+			status = ['for sale', 'under offer']
 	elif propStatus == 'under application':
 		status = ['for rent', 'under application']
 	elif propStatus == 'let':
