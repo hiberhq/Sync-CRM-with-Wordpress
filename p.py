@@ -388,14 +388,15 @@ def submitProperty(property, post=None, update=False):
 	featuresList = [prop['indoor_features'], prop['heating_cooling_features'], prop['eco_friendly_features'], prop['outdoor_features'], prop['other_features']]
 	features = []
 	for feature in featuresList:
-		feature = feature.replace(',', '|')
-		feature = feature.split('|')
-		if isinstance(feature, list):
-			for feature2 in feature:
-				if feature2:
-					features.append(feature2.strip())
-		else:
-			features.append(feature.strip())
+		if feature:
+			feature = feature.replace(',', '|')
+			feature = feature.split('|')
+			if isinstance(feature, list):
+				for feature2 in feature:
+					if feature2:
+						features.append(feature2.strip())
+			else:
+				features.append(feature.strip())
 
 	# states
 	states = {
