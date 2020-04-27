@@ -76,6 +76,10 @@ def getEagleToken():
 			log('Error while trying to parse JSON. %s' % e, 'red')
 			exit(-1)
 
+	except ConnectionResetError:
+		time.sleep(60)
+		return getEagleToken()
+
 	except Exception as e:
 		log(e, 'red')
 		exit(-1)
@@ -96,6 +100,10 @@ def req(method, url, dataType='json', data='', headers={}):
 		except Exception as e:
 			log('Couldn\'t parse Response. %s' % e, 'red')
 			exit(-1)
+	
+	except ConnectionResetError:
+		time.sleep(60)
+		return req(method, url, dataType, data, headers)
 
 	except requests.exceptions.RequestException as e:
 		log(str(e.response) + ' %s' % url, 'red')
@@ -158,6 +166,10 @@ def getCRMPropertiesList():
 			
 			offset += 60
 
+	except ConnectionResetError:
+		time.sleep(60)
+		return getCRMPropertiesList()
+
 	except Exception as e:
 		log('Error while trying to get properties. %s' % e, 'red')
 		exit(-1)
@@ -176,6 +188,11 @@ def reqToWPREST(method, url, data='', headers={}, files={}):
 		req = requests.request(method, url, data=data, headers=headers, timeout=90)
 		responseCode = req.status_code
 		response = req.text
+
+	except ConnectionResetError:
+		time.sleep(60)
+		return reqToWPREST(method, url, data, headers)
+
 	except Exception as e:
 		log('Exception in request. ' + str(e) + ' %s' % url, 'red')
 		responseCode = False
