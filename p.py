@@ -162,7 +162,14 @@ def getCRMPropertiesList():
 
 			except Exception as e:
 				log('Error while trying to parse JSON. %s' % e, 'red')
-				exit(-1)
+				log(response.text, 'red')
+
+				#
+				# Result is not a JSON, because of maintenance mode for example
+				# do not exit, let't try again
+				#
+				time.sleep(180)
+				return getCRMPropertiesList()
 			
 			offset += 60
 
