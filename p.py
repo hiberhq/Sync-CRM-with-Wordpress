@@ -99,15 +99,20 @@ def req(method, url, dataType='json', data='', headers={}):
 
 		except Exception as e:
 			log('Couldn\'t parse Response. %s' % e, 'red')
-			exit(-1)
+			# Try again
+			time.sleep(60)
+			return req(method, url, dataType, data, headers)
 	
 	except ConnectionResetError:
+		# Try again
 		time.sleep(60)
 		return req(method, url, dataType, data, headers)
 
 	except requests.exceptions.RequestException as e:
 		log(str(e.response) + ' %s' % url, 'red')
-		exit(-1)
+		# Try again
+		time.sleep(60)
+		return req(method, url, dataType, data, headers)
 
 
 def convertDate(dateStr):
@@ -179,7 +184,8 @@ def getCRMPropertiesList():
 
 	except Exception as e:
 		log('Error while trying to get properties. %s' % e, 'red')
-		exit(-1)
+		time.sleep(60)
+		return getCRMPropertiesList()
 
 
 def getProperty(id):
@@ -212,7 +218,9 @@ def reqToWPREST(method, url, data='', headers={}, files={}):
 
 		except Exception as e:
 			log('%s. %s. %s. %s' % (url, responseCode, data, response), 'red')
-			exit(-1)
+			# Try again
+			time.sleep(60)
+			return reqToWPREST(method, url, data, headers)
 
 	else:
 		# Try again
