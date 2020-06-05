@@ -445,6 +445,8 @@ def submitProperty(property, post=None, update=False):
 
 	# price
 	price = prop['alt_to_price'] if prop['alt_to_price'] else prop['price'] if prop['price'] and prop['price'] != '0.0' else prop['advertised_price']
+	if price == 'Contact for price' and 'leased' in status:
+		price = 'Leased and expertly managed by Savoy'
 
 	# map
 	mapShow = 1 if prop['latitude'] else 0
