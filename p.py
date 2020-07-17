@@ -414,7 +414,7 @@ def submitProperty(property, post=None, update=False):
 		status = ['leased']
 	else:
 		# Sold
-		status = [status]
+		status = ['sold']
 
 	# features
 	featuresList = [prop['indoor_features'], prop['heating_cooling_features'], prop['eco_friendly_features'], prop['outdoor_features'], prop['other_features']]
