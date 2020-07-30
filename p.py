@@ -441,7 +441,9 @@ def submitProperty(property, post=None, update=False):
 
 	# agents
 	# get last id in agents array
-	agent = getAgentByCRMID( [ prop['agent_ids'][len(prop['agent_ids']) - 1] ] )
+	#agent = getAgentByCRMID( [ prop['agent_ids'][len(prop['agent_ids']) - 1] ] )
+	# use firts agent
+	agent = getAgentByCRMID( [ prop['agent_ids'][0] ] )
 
 	# price
 	price = prop['alt_to_price'] if prop['alt_to_price'] else prop['price'] if prop['price'] and prop['price'] != '0.0' else prop['advertised_price']
