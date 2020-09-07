@@ -39,4 +39,4 @@ Edit the cron tasks:
 
 Run it every 15 minutes:
 
-`*/15 * * * * cd /opt/bitnami/apps/wordpress/htdocs/automation/ && python3 p.py >> /opt/bitnami/apps/wordpress/htdocs/automation/log.txt`
+`*/15 * * * * cd /ABSOLUTE_PATH_TO_DIR/ && python3 p.py >> /ABSOLUTE_PATH_TO_DIR/log.txt`
