@@ -29,3 +29,14 @@ Run script in background:
 Check python processes:
 
 `ps ax | grep p.py`
+
+
+## Using Cron
+
+Edit the cron tasks:
+
+`crontab -e`
+
+Run it every 15 minutes:
+
+`*/15 * * * * cd /opt/bitnami/apps/wordpress/htdocs/automation/ && python3 p.py >> /opt/bitnami/apps/wordpress/htdocs/automation/log.txt`

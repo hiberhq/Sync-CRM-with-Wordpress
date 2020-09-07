@@ -15,7 +15,6 @@ load_dotenv()
 os.system('clear')
 
 DEBUG = True
-RUN_INTERVAL = 60 * 15
 EAGLE_LOGIN = os.getenv('EAGLE_LOGIN')
 EAGLE_PASS = os.getenv('EAGLE_PASS')
 SITE_LOGIN = os.getenv('SITE_LOGIN')
@@ -729,7 +728,5 @@ def run():
 
 if __name__ == '__main__':
 	HEADERS_AUTH_EAGLE = {'Authorization': getEagleToken(), 'Content-Type': 'application/vnd.api+json'}
-	while True:
-		run()
-		debug('Task completed.', True)
-		time.sleep(RUN_INTERVAL)
+	run()
+	debug('Task completed.', True)
