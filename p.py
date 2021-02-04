@@ -135,11 +135,16 @@ def getSitePropertiesList():
 		}
 		response = reqToWPREST('GET', SITE_DOMAIN + '/wp-json/wp/v2/property', data=json.dumps(propsData))
 
+		# If it is not a list
+		if isinstance(response, dict):
+			# We've got some error
+			return output
+
 		for item in response:
 			output.append(item)
 
 		if len(response) < limit:
-			debug('Received site data.')
+			debug('Received site data: %d items' % len(output))
 			return output
 
 		page += 1

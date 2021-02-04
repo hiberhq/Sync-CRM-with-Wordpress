@@ -2,4 +2,6 @@
 connect.sh
 test.py
 test1.py
-.DS_Store
+test-data.json
+test-get-props.py
+DS_Store
