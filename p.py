@@ -681,7 +681,8 @@ def checkPropertyChanges(post, property):
 			'force': False
 		}
 		req = reqToWPREST('DELETE', SITE_DOMAIN + '/wp-json/wp/v2/property/%d' % post['id'], data=json.dumps(rdata))
-		if 'deleted' in req:
+		# actual condition for 'force': False
+		if 'status' in req and req['status'] == 'trash':
 			log('Property id=%s was deleted. Status %s -> %s' % (post['id'], post['property_status'], prop['status']), 'cyan')
 		else:
 			log('Property wasn\'t deleted. %s. Status %s -> %s' % (req, post['property_status'], prop['status']), 'red')
